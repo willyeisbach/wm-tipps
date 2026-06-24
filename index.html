@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏆 WM Tipp-Stock Exchange 🏆</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- SOFORTIGE FILE-PROTOKOLL WARNUNG (Falls per Doppelklick geöffnet und ES-Module blockiert sind) -->
+  <script>
+    if (window.location.protocol === 'file:') {
+      document.write(`
+        <div style="background: #ef4444; color: white; padding: 1.5rem; text-align: center; font-family: sans-serif; font-weight: bold; position: sticky; top: 0; z-index: 9999; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+          ⚠️ BROWSER-SICHERHEIT: Doppelklick blockiert! ⚠️<br>
+          <span style="font-weight: normal; font-size: 0.95rem; display: inline-block; margin-top: 0.5rem; max-width: 800px;">
+            Moderne Browser blockieren JavaScript-Module und Ordner-Zugriffe, wenn Sie die HTML-Datei direkt über Doppelklick (file://) öffnen.
+            <br><br>
+            <strong>Einfache Lösung für Sie & Ihre Kollegen:</strong><br>
+            Starten Sie einen lokalen Webserver (z. B. mit <code>python -m http.server 8080</code> in der PowerShell) und rufen Sie <strong>http://localhost:8080</strong> auf. 
+            Oder hosten Sie die 4 Dateien auf einem HTTPS-Server (wie GitHub Pages).
+          </span>
+        </div>
+      `);
+    }
+  </script>
+
+  <div class="app-container">
+    
+    <!-- HEADER -->
+    <header>
+      <div>
+        <h1>🏆 WM Tipp-Stock Exchange</h1>
+        <p style="color: var(--color-text-muted); margin: 0.25rem 0 0 0;">Dezentrales Krypto-Trading für Kolleginnen & Kollegen</p>
+      </div>
+      <div id="connection-status" style="text-align: right;">
+        <span class="status-pill status-yellow">Ordner getrennt</span>
+        <div id="ledger-fingerprint" title="Kurz-Prüfsumme der gesamten Historie. Sollte bei allen Kolleg:innen identisch sein." style="display:none; font-family: monospace; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.4rem;"></div>
+      </div>
+    </header>
+
+    <!-- INTEGRITY / ANTI-TAMPER WARNING BANNER -->
+    <div id="integrity-banner" style="display:none; background: rgba(245, 158, 11, 0.12); border: 1px solid var(--color-warning); color: var(--color-warning); padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem; line-height: 1.5;"></div>
+
+    <!-- STEP 1: FOLDER PICKER OVERLAY -->
+    <div id="step-connect" class="card overlay-card">
+      <h2 style="border: none; margin-bottom: 1.5rem;">OneDrive / SharePoint verbinden</h2>
+      <p style="color: var(--color-text-muted); margin-bottom: 2rem;">
+        Wählen Sie den synchronisierten lokalen SharePoint- oder OneDrive-Pfad aus, um dem dezentralen Netzwerk beizutreten.
+      </p>
+      <button id="btn-connect-dir" class="btn">
+        📁 Ordner auswählen
+      </button>
+    </div>
+
+    <!-- STEP 2: REGISTER USERNAME OVERLAY -->
+    <div id="step-register" class="card overlay-card" style="display: none;">
+      <h2 style="border: none; margin-bottom: 1.5rem;">Wer bist du?</h2>
+      <p style="color: var(--color-text-muted); margin-bottom: 1.5rem;">
+        Registriere deinen Namen. Dein Browser generiert im Hintergrund deinen unhackbaren Private-Key.
+      </p>
+      <div class="form-group">
+        <input type="text" id="input-username" placeholder="Dein Klarname (z.B. Max)">
+      </div>
+      <button id="btn-register" class="btn btn-success" style="width: 100%; margin-bottom: 1.5rem;">
+        🚀 Beitreten & 10€ + 100 Aktien erhalten
+      </button>
+
+      <div style="border-top: 1px dashed var(--border-color); padding-top: 1.5rem; margin-top: 1.5rem; text-align: left;">
+        <h3 style="font-size: 0.9rem; color: var(--color-text-muted); margin-top: 0;">Bereits registriert? Wallet wiederherstellen</h3>
+        <p style="color: var(--color-text-muted); font-size: 0.8rem; margin-bottom: 1rem;">Lade deine heruntergeladene Backup-Datei (.json) hoch, um deinen Account wiederherzustellen.</p>
+        <input type="file" id="input-restore-wallet" accept=".json" style="font-size: 0.85rem; padding: 0.5rem; border: 1px dashed var(--border-color); cursor: pointer;">
+      </div>
+    </div>
+
+    <!-- STEP 3: AWAITING VERIFICATION SCREEN (Anti-Sybil lock) -->
+    <div id="step-pending-verification" class="card overlay-card" style="display: none;">
+      <h2 style="border: none; margin-bottom: 1.5rem; color: #f59e0b;">Ausstehende Verifikation...</h2>
+      <p style="color: var(--color-text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+        Dein Beitritts-Antrag wurde verschlüsselt im SharePoint-Ordner abgelegt.<br>
+        Um Fake-Profile (Sybils) zu verhindern, müssen mindestens <strong>75% der aktiven Kollegen</strong> manuell zustimmen.
+      </p>
+      <div class="card" style="background: var(--bg-input); margin-bottom: 2rem;">
+        <div class="metric-label" style="margin-bottom: 0.5rem;">Erhaltene Zustimmungen:</div>
+        <div id="pending-verification-stats" style="font-size: 2rem; font-weight: bold; color: var(--color-warning);">
+          0 / 1 erhalten
+        </div>
+      </div>
+      <p style="font-size: 0.9rem; color: var(--color-primary); font-weight: bold; margin-bottom: 2rem;">
+        💬 Bitte im Tippspiel-Chat Bescheid geben, damit deine Kollegen synchronisieren und dich freigeben!
+      </p>
+      <button id="btn-pending-sync" class="btn btn-secondary" style="width: 100%;">
+        🔄 Status aktualisieren
+      </button>
+    </div>
+
+    <!-- STEP 3b: NAME ALREADY TAKEN ERROR SCREEN -->
+    <div id="step-name-taken" class="card overlay-card" style="display: none;">
+      <h2 style="border: none; margin-bottom: 1.5rem; color: var(--color-danger);">❌ Name bereits vergeben</h2>
+      <p style="color: var(--color-text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+        Der Name „<strong id="name-taken-name" style="color: var(--color-text-main);"></strong>" gehört bereits einem
+        anderen Mitglied. Namen müssen eindeutig sein – bitte wähle einen anderen.
+      </p>
+      <button id="btn-choose-other-name" class="btn btn-success" style="width: 100%;">
+        ✏️ Anderen Namen wählen
+      </button>
+    </div>
+
+    <!-- STEP 3c: REGISTRATION DECLINED BY HOST/ADMIN -->
+    <div id="step-declined" class="card overlay-card" style="display: none;">
+      <h2 style="border: none; margin-bottom: 1.5rem; color: var(--color-danger);">🚫 Beitritt abgelehnt</h2>
+      <p style="color: var(--color-text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+        Dein Beitritts-Antrag als „<strong id="declined-name" style="color: var(--color-text-main);"></strong>"
+        hat nicht genug Zustimmung erhalten – zu viele Mitglieder haben abgelehnt, sodass die nötige
+        Mehrheit nicht mehr erreichbar ist. Du kannst nicht am Tippspiel teilnehmen.<br>
+        Bei Fragen wende dich bitte an die Mitspieler.
+      </p>
+      <button id="btn-declined-other-name" class="btn btn-secondary" style="width: 100%;">
+        ✏️ Mit anderem Namen erneut versuchen
+      </button>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
+    <div id="app-main" style="display: none;">
+      
+      <!-- WALLET & QUICK METRICS ROW -->
+      <div class="metrics">
+        <div class="metric-card">
+          <span class="metric-label">Mein Cash-Guthaben</span>
+          <span id="metric-cash" class="metric-value currency">0.00 EUR</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Meine eigenen Aktien</span>
+          <span id="metric-own-shares" class="metric-value accent">100 Stück</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Aktionäre von mir</span>
+          <span id="metric-investors" class="metric-value accent">0</span>
+        </div>
+        <div class="metric-card" style="position: relative;">
+          <span class="metric-label">Kryptokonto (Public Key)</span>
+          <span id="metric-pubkey" style="font-family: monospace; font-size: 0.85rem; margin-top: 0.75rem; word-break: break-all; color: var(--color-text-muted);">
+            Keiner
+          </span>
+          <div style="position: absolute; right: 0.5rem; bottom: 0.5rem; display: flex; gap: 0.25rem;">
+            <button id="btn-copy-key" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+              Copy
+            </button>
+            <button id="btn-backup-key" class="btn btn-success" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+              💾 Backup
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SYBIL DEFENSE: PENDING REGISTRATIONS APPROVAL PANEL -->
+      <div id="sybil-approval-panel" class="card" style="border: 2px solid var(--color-warning); background: rgba(245, 158, 11, 0.03); margin-bottom: 1.5rem; display: none;">
+        <h2 style="color: var(--color-warning); border-color: rgba(245, 158, 11, 0.2);">⚠️ Ausstehende Mitglieder-Freigaben (Zulassungsverfahren)</h2>
+        <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">Neue Personen möchten dem Markt beitreten. Bitte verifizieren Sie diese manuell, um Sybil-Profile auszuschließen.</p>
+        <div id="sybil-requests-list">
+          <!-- Dynamische Liste mit Zustimmungsbuttons -->
+        </div>
+      </div>
+
+      <div class="grid">
+        
+        <!-- LEFT COLUMN: TABS & TABLES -->
+        <div>
+          <ul class="tab-list">
+            <li class="tab-item active" data-tab="depot">Mein Depot</li>
+            <li class="tab-item" data-tab="market">Mitgliederliste</li>
+            <li class="tab-item" data-tab="orderbook">Marktplatz & Orderbuch</li>
+            <li class="tab-item" data-tab="chart">Kurs-Chart</li>
+            <li class="tab-item" data-tab="ledger">Ledger & Krypto-Logs</li>
+            <li class="tab-item" data-tab="payout">Jackpot-Auszahlung</li>
+          </ul>
+
+          <!-- TAB: Mein Depot -->
+          <div id="tab-content-depot" class="tab-pane card">
+            <h2>💼 Meine Besitztümer</h2>
+            <div id="depot-list">
+              <p style="color: var(--color-text-muted)">Keine Bestände vorhanden.</p>
+            </div>
+          </div>
+
+          <!-- TAB: Mitgliederliste -->
+          <div id="tab-content-market" class="tab-pane card" style="display: none;">
+            <h2>📈 Registrierte Kollegen-AGs</h2>
+            <p style="color: var(--color-text-muted); margin-bottom: 1.5rem;">Hier sind alle Kollegen aufgelistet, die sich im Netzwerk registriert haben und zugelassen wurden.</p>
+            <div id="market-list">
+              <!-- Handelseinträge -->
+            </div>
+          </div>
+
+          <!-- TAB: Marktplatz & Orderbuch -->
+          <div id="tab-content-orderbook" class="tab-pane card" style="display: none;">
+            <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+              
+              <!-- My pending trades (validation in progress) -->
+              <div id="my-pending-trades-wrap" style="display:none;">
+                <h2>⏳ Deine laufenden Trades (Validierung läuft)</h2>
+                <p style="color: var(--color-text-muted); margin-bottom: 1rem;">Käufe/Verkäufe, an denen du beteiligt bist, werden gerade von unabhängigen Kolleg:innen bestätigt. Sobald genügend Zeugen signiert haben, wird der Trade ausgeführt.</p>
+                <div id="my-pending-trades-list"></div>
+              </div>
+
+              <!-- Open Orders Marketplace -->
+              <div>
+                <h2>🔔 Offene Verkaufsangebote (Marktplatz)</h2>
+                <p style="color: var(--color-text-muted); margin-bottom: 1rem;">Wer zuerst klickt, kauft die Anteile. Die Krypto-Validierung durch unabhängige Kolleg:innen läuft vollautomatisch im Hintergrund.</p>
+                <div id="marketplace-orders-list">
+                  <p style="color: var(--color-text-muted)">Aktuell keine offenen Verkaufsangebote im Orderbuch.</p>
+                </div>
+              </div>
+
+              <!-- Open Buy Orders Marketplace -->
+              <div>
+                <h2>🟢 Offene Kaufgesuche (Marktplatz)</h2>
+                <p style="color: var(--color-text-muted); margin-bottom: 1rem;">Jemand sucht Aktien und bietet EUR. Wer die gesuchten Aktien besitzt, kann zuerst klicken und verkaufen. Validierung läuft automatisch im Hintergrund.</p>
+                <div id="marketplace-buyorders-list">
+                  <p style="color: var(--color-text-muted)">Aktuell keine offenen Kaufgesuche im Orderbuch.</p>
+                </div>
+              </div>
+
+              <!-- Create Sell Order Form -->
+              <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h2>✍ Neues Verkaufsangebot einstellen</h2>
+                <form id="form-sell-order">
+                  <div class="form-group">
+                    <label for="sell-asset">Welche Aktie verkaufen?</label>
+                    <select id="sell-asset" required>
+                      <option value="">Wähle ein Asset im Besitz...</option>
+                    </select>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                      <label for="sell-amount">Anzahl Aktien (Stück)</label>
+                      <input type="number" id="sell-amount" min="1" max="100" placeholder="z.B. 10" required>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="sell-price-per-unit">Preis pro Stück (EUR)</label>
+                      <input type="number" id="sell-price-per-unit" min="0.01" step="any" placeholder="z.B. 2.50" required>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 1rem;">
+                    📢 Verkaufsorder signieren & ins Orderbuch stellen
+                  </button>
+                </form>
+              </div>
+
+              <!-- Create Buy Order Form -->
+              <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h2>🛒 Neue Kaufsorder einstellen</h2>
+                <form id="form-buy-order">
+                  <div class="form-group">
+                    <label for="buy-asset">Welche Aktie kaufen?</label>
+                    <select id="buy-asset" required>
+                      <option value="">Wähle eine Kollegen-AG...</option>
+                    </select>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                      <label for="buy-amount">Anzahl Aktien (Stück)</label>
+                      <input type="number" id="buy-amount" min="1" max="100" placeholder="z.B. 10" required>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="buy-price-per-unit">Preis pro Stück (EUR)</label>
+                      <input type="number" id="buy-price-per-unit" min="0.01" step="any" placeholder="z.B. 2.50" required>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    📢 Kaufsorder signieren & ins Orderbuch stellen
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Kurs-Chart -->
+          <div id="tab-content-chart" class="tab-pane card" style="display: none;">
+            <h2>📊 Aktienkurs-Verlauf (aus der Blockchain)</h2>
+            <p style="color: var(--color-text-muted); margin-bottom: 1.5rem;">
+              Jede Kollegen-AG startet bei <strong id="chart-initial-price">0.05</strong> EUR/Aktie. Jeder bestätigte
+              Trade setzt einen neuen Kurspunkt. Wähle eine oder mehrere Aktien aus, um ihren Kursverlauf zu vergleichen.
+            </p>
+
+            <div class="form-group">
+              <label for="chart-asset-select">Aktien auswählen (Mehrfachauswahl: Strg/Cmd bzw. Shift)</label>
+              <select id="chart-asset-select" multiple size="6" style="height: auto; min-height: 8rem;">
+                <!-- Dynamische Optionen je registrierter Kollegen-AG -->
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+              <button type="button" id="btn-chart-select-all" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Alle auswählen</button>
+              <button type="button" id="btn-chart-clear" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Auswahl löschen</button>
+            </div>
+
+            <div id="chart-container" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; overflow-x: auto;">
+              <p style="color: var(--color-text-muted)">Wähle oben eine oder mehrere Aktien aus, um den Kursverlauf anzuzeigen.</p>
+            </div>
+
+            <div id="chart-legend" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem;"></div>
+          </div>
+
+          <!-- TAB: Ledger & Krypto-Logs -->
+          <div id="tab-content-ledger" class="tab-pane card" style="display: none;">
+            <h2>⛓ Validierte Blockchain-Historie (Commits)</h2>
+            <p style="color: var(--color-text-muted);">Diese Transaktionen wurden von genügend unabhängigen Zeugen unumstößlich bestätigt.</p>
+            <div id="ledger-list" style="max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; background: var(--bg-input); padding: 1rem; border-radius: 6px; margin-bottom: 2rem;">
+              <!-- Ledger -->
+            </div>
+
+            <h2>⏳ Unbestätigter Mempool (Warteschlange)</h2>
+            <p style="color: var(--color-text-muted);">Diese Transaktionen warten auf die Freigabe / Validierung durch die Kollegen (unabhängige Zeugen benötigt).</p>
+            <div id="mempool-list" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; background: var(--bg-input); padding: 1rem; border-radius: 6px;">
+              <!-- Mempool -->
+            </div>
+          </div>
+
+          <!-- TAB: Jackpot-Auszahlung -->
+          <div id="tab-content-payout" class="tab-pane card" style="display: none;">
+            <h2>💰 Finaler Auszahlungs-Rechner (Simulieren & Abrechnen)</h2>
+            <p id="payout-intro" style="color: var(--color-text-muted); margin-bottom: 1.5rem;">
+              Sobald die WM vorbei ist, wähle hier die Tippspiel-Sieger für Platz 1, 2 und 3.
+              Der reale Pool wird als Preisgeld an die jeweilige „Ich-AG" ausgeschüttet und
+              anhand der Aktienanteile auf alle Aktionäre verteilt.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+              <div>
+                <h3>Tippspiel-Platzierung eintragen</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                  <div class="form-group">
+                    <label>🥇 Platz 1</label>
+                    <select id="payout-rank-1" class="payout-rank-select"><option value="">– wählen –</option></select>
+                  </div>
+                  <div class="form-group">
+                    <label>🥈 Platz 2</label>
+                    <select id="payout-rank-2" class="payout-rank-select"><option value="">– wählen –</option></select>
+                  </div>
+                  <div class="form-group">
+                    <label>🥉 Platz 3</label>
+                    <select id="payout-rank-3" class="payout-rank-select"><option value="">– wählen –</option></select>
+                  </div>
+                </div>
+                <button id="btn-calc-payout" class="btn btn-success" style="width: 100%;">
+                  🧮 Auszahlung berechnen
+                </button>
+              </div>
+
+              <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h3>Reale Auszahlung (nach Aktienanteilen)</h3>
+                <div id="payout-results-list">
+                  <p style="color: var(--color-text-muted)">Wähle oben die Platzierung und berechne, um Ergebnisse zu sehen.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: PEERS & ACTIONS -->
+        <div>
+          <div class="card" style="margin-bottom: 1.5rem;">
+            <h2>👥 Aktive Kollegen</h2>
+            <div id="peers-list">
+              <!-- Kollegen -->
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>🔄 Synchronisieren</h2>
+            <p style="color: var(--color-text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+              OneDrive/SharePoint synchronisiert im Hintergrund. Klicke auf Sync, um die neuesten Daten deiner Kollegen einzulesen.
+            </p>
+            <button id="btn-sync" class="btn btn-secondary" style="width: 100%;">
+              🔄 Jetzt synchronisieren
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast">Info-Meldung</div>
+
+  <!-- LOGIC SCRIPT -->
+  <script type="module">
+    import { TippspielApp } from './app.js';
+    import { CryptoHelper } from './crypto-helper.js';
+
+    const app = new TippspielApp();
+
+    // === KONFIGURATION (vom Gründer anzupassen) ===
+    // Trage hier den Public Key des Gründers ein (Dashboard -> "Copy"), damit nur
+    // dieser als Genesis-Admin gilt. Solange leer, wird der erste Registrierer
+    // automatisch akzeptiert (weniger sicher – ein Warnbanner weist darauf hin).
+    app.config.bootstrapAdmins = [
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEg/Ml4XrfmNhYP0nt64w8iArYDW/fFZg8TEFhjDARm93QFLHji8oEcZGh/LR/Bvr8O1BfLngoDLckIaBnPFM/g=="
+    ];
+
+    // Integritäts-/Manipulationswarnungen anzeigen, sobald erkannt.
+    app.onIntegrityWarning = (warnings) => {
+      const banner = document.getElementById('integrity-banner');
+      if (!banner) return;
+      banner.innerHTML = '⚠️ ' + warnings.join('<br>⚠️ ');
+      banner.style.display = 'block';
+    };
+
+    // Käufer informieren, wenn sein Kauf ein Rennen verloren hat (Angebot war
+    // bereits an einen anderen Käufer vergeben). Es wurde kein Geld abgebucht.
+    app.onTradeRejected = (trades) => {
+      const n = trades.length;
+      showToast(n === 1
+        ? "Schade – das Angebot war bereits vergeben. Dein Kauf kam nicht zustande (es wurde kein Geld abgebucht)."
+        : `${n} deiner Käufe kamen nicht zustande – die Angebote waren bereits vergeben (kein Geld abgebucht).`);
+    };
+
+    // DOM Elements
+    const stepConnect = document.getElementById('step-connect');
+    const stepRegister = document.getElementById('step-register');
+    const stepPendingVerification = document.getElementById('step-pending-verification');
+    const stepNameTaken = document.getElementById('step-name-taken');
+    const stepDeclined = document.getElementById('step-declined');
+    const appMain = document.getElementById('app-main');
+    const connectionStatus = document.getElementById('connection-status');
+    const toastElement = document.getElementById('toast');
+
+    // UI Toast Trigger
+    function showToast(message) {
+      toastElement.textContent = message;
+      toastElement.classList.add('visible');
+      setTimeout(() => toastElement.classList.remove('visible'), 3000);
+    }
+
+    // Tab Navigation
+    document.querySelectorAll('.tab-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.tab-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+        
+        item.classList.add('active');
+        const contentId = `tab-content-${item.getAttribute('data-tab')}`;
+        document.getElementById(contentId).style.display = 'block';
+      });
+    });
+
+    // === KURS-CHART ===
+    const CHART_COLORS = ['#38bdf8', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#ec4899', '#22d3ee', '#84cc16', '#f97316', '#eab308'];
+
+    // Renders an SVG step-line chart of the selected shares' price history.
+    function renderChart() {
+      const select = document.getElementById('chart-asset-select');
+      const container = document.getElementById('chart-container');
+      const legend = document.getElementById('chart-legend');
+      if (!select || !container) return;
+
+      const selected = Array.from(select.selectedOptions).map(o => o.value);
+      const history = app.getPriceHistory();
+
+      if (selected.length === 0) {
+        container.innerHTML = '<p style="color: var(--color-text-muted)">Wähle oben eine oder mehrere Aktien aus, um den Kursverlauf anzuzeigen.</p>';
+        legend.innerHTML = '';
+        return;
+      }
+
+      // Build series + global bounds.
+      const series = [];
+      let minT = Infinity, maxT = -Infinity, minP = Infinity, maxP = -Infinity;
+      selected.forEach((asset, idx) => {
+        const pts = (history[asset] || []).slice().sort((a, b) => a.timestamp - b.timestamp);
+        if (pts.length === 0) return;
+        const ownerKey = asset.replace('SHARE_', '');
+        const name = app.names[ownerKey] || ownerKey.substring(0, 8);
+        series.push({ asset, name, color: CHART_COLORS[idx % CHART_COLORS.length], points: pts });
+        for (const p of pts) {
+          if (p.timestamp < minT) minT = p.timestamp;
+          if (p.timestamp > maxT) maxT = p.timestamp;
+          if (p.price < minP) minP = p.price;
+          if (p.price > maxP) maxP = p.price;
+        }
+      });
+
+      if (series.length === 0) {
+        container.innerHTML = '<p style="color: var(--color-text-muted)">Für die Auswahl liegen noch keine Kursdaten vor.</p>';
+        legend.innerHTML = '';
+        return;
+      }
+
+      // Extend the time axis to "now" so a flat line reaches the right edge.
+      const now = Date.now();
+      if (now > maxT) maxT = now;
+
+      // Pad bounds so single points / flat lines are still visible.
+      if (minT === maxT) { minT -= 1; maxT += 1; }
+      if (minP === maxP) { const d = minP === 0 ? 1 : minP * 0.5; minP -= d; maxP += d; }
+      minP = Math.max(0, minP - (maxP - minP) * 0.1);
+      maxP = maxP + (maxP - minP) * 0.1;
+
+      // SVG geometry.
+      const W = 760, H = 360, padL = 60, padR = 20, padT = 20, padB = 40;
+      const plotW = W - padL - padR, plotH = H - padT - padB;
+      const x = t => padL + ((t - minT) / (maxT - minT)) * plotW;
+      const y = p => padT + (1 - (p - minP) / (maxP - minP)) * plotH;
+
+      const fmtDate = ts => new Date(ts).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+      let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px; font-family: 'Segoe UI', sans-serif;">`;
+
+      // Y grid lines + price labels.
+      const ySteps = 4;
+      for (let i = 0; i <= ySteps; i++) {
+        const price = minP + (maxP - minP) * (i / ySteps);
+        const yy = y(price);
+        svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#24324f" stroke-width="1"/>`;
+        svg += `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="#94a3b8">${price.toFixed(2)}</text>`;
+      }
+
+      // X axis labels (start / mid / end).
+      for (let i = 0; i <= 2; i++) {
+        const ts = minT + (maxT - minT) * (i / 2);
+        const xx = x(ts);
+        const anchor = i === 0 ? 'start' : i === 2 ? 'end' : 'middle';
+        svg += `<text x="${xx}" y="${H - padB + 18}" text-anchor="${anchor}" font-size="10" fill="#94a3b8">${fmtDate(ts)}</text>`;
+      }
+
+      // Axis lines.
+      svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" stroke="#475569" stroke-width="1"/>`;
+      svg += `<line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#475569" stroke-width="1"/>`;
+
+      // Series as step lines (price holds until the next trade).
+      for (const s of series) {
+        let d = '';
+        s.points.forEach((p, i) => {
+          const px = x(p.timestamp), py = y(p.price);
+          if (i === 0) { d += `M ${px} ${py}`; }
+          else { d += ` L ${px} ${py}`; } // vertical move handled by step below
+          // Step: hold this price horizontally until the next point's timestamp.
+          const next = s.points[i + 1];
+          if (next) { d += ` L ${x(next.timestamp)} ${py}`; }
+        });
+        // Extend the last price flat to the right edge (now).
+        const last = s.points[s.points.length - 1];
+        d += ` L ${x(maxT)} ${y(last.price)}`;
+        svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+        // Dots on actual trade points.
+        for (const p of s.points) {
+          svg += `<circle cx="${x(p.timestamp)}" cy="${y(p.price)}" r="3" fill="${s.color}"/>`;
+        }
+      }
+
+      svg += `</svg>`;
+      container.innerHTML = svg;
+
+      // Legend with current (latest) price.
+      legend.innerHTML = series.map(s => {
+        const last = s.points[s.points.length - 1];
+        return `<span style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.9rem;">
+          <span style="width:14px; height:14px; border-radius:3px; background:${s.color}; display:inline-block;"></span>
+          <strong>${s.name}</strong>
+          <span style="color: var(--color-text-muted);">akt. ${last.price.toFixed(2)} EUR</span>
+        </span>`;
+      }).join('');
+    }
+
+    // Chart multi-select + buttons.
+    document.getElementById('chart-asset-select').addEventListener('change', renderChart);
+    document.getElementById('btn-chart-select-all').addEventListener('click', () => {
+      const select = document.getElementById('chart-asset-select');
+      Array.from(select.options).forEach(o => o.selected = true);
+      renderChart();
+    });
+    document.getElementById('btn-chart-clear').addEventListener('click', () => {
+      const select = document.getElementById('chart-asset-select');
+      Array.from(select.options).forEach(o => o.selected = false);
+      renderChart();
+    });
+
+    // Step 1: Connect Sync Folder
+    document.getElementById('btn-connect-dir').addEventListener('click', async () => {
+      // Sicherheits- & Kompatibilitäts-Überprüfung
+      if (!window.showDirectoryPicker) {
+        if (window.location.protocol === 'file:') {
+          alert("Sicherheits-Blockade des Browsers:\n\nDie Ordner-Auswahl funktioniert aus Sicherheitsgründen nicht, wenn Sie die Datei direkt per Doppelklick (file://) öffnen.\n\nLösung:\n1. Nutzen Sie einen lokalen Server (z.B. localhost) für Tests.\n2. Oder hosten Sie die 4 Dateien auf einem HTTPS-Server (z.B. GitHub Pages). Von dort aus kann die App problemlos auf Ihren lokalen Ordner zugreifen!");
+        } else {
+          alert("Browser nicht unterstützt:\n\nIhr aktueller Browser (z. B. Firefox oder Safari) unterstützt den direkten Zugriff auf lokale Ordner leider nicht.\n\nBitte nutzen Sie einen Chromium-basierten Browser wie Microsoft Edge, Google Chrome, Opera oder Brave!");
+        }
+        showToast("Fehler: Browser oder Protokoll nicht unterstützt.");
+        return;
+      }
+
+      try {
+        await app.selectSyncFolder();
+        showToast("SharePoint-Verzeichnis erfolgreich angebunden!");
+        connectionStatus.innerHTML = '<span class="status-pill status-green">Sync Ordner verbunden</span>';
+        
+        stepConnect.style.display = 'none';
+        
+        // Load Wallet
+        await app.initWallet();
+        
+        if (!app.myName) {
+          stepRegister.style.display = 'block';
+        } else {
+          stepRegister.style.display = 'none';
+          await app.syncLedger();
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("Ordner-Zugriff verweigert oder abgebrochen.");
+      }
+    });
+
+    // Step 2: Register Username
+    document.getElementById('btn-register').addEventListener('click', async () => {
+      const usernameInput = document.getElementById('input-username');
+      const name = usernameInput.value.trim();
+      
+      if (!name) {
+        showToast("Bitte gib einen Klarnamen ein.");
+        return;
+      }
+
+      // Pre-check: refuse a name that another committed member already owns, so we
+      // don't write a doomed duplicate REGISTER_NAME into the folder.
+      const takenByOther = Object.entries(app.names).some(([k, n]) => n === name && k !== app.myKeys.pubKeyBase64);
+      if (takenByOther) {
+        document.getElementById('name-taken-name').textContent = name;
+        stepRegister.style.display = 'none';
+        stepNameTaken.style.display = 'block';
+        return;
+      }
+
+      try {
+        stepRegister.style.display = 'none';
+        
+        // Set Username (triggers REGISTER_NAME file write)
+        await app.setUsername(name);
+        
+        // Let the state engine run once to detect that our registration is pending approval
+        await app.syncLedger();
+      } catch (e) {
+        console.error(e);
+        showToast("Fehler bei der Registrierung.");
+      }
+    });
+
+    // "Choose another name" after a name-taken rejection: forget the local name
+    // and return to the registration screen (wallet/keys are kept).
+    document.getElementById('btn-choose-other-name').addEventListener('click', () => {
+      app.clearUsername();
+      stepNameTaken.style.display = 'none';
+      stepPendingVerification.style.display = 'none';
+      const input = document.getElementById('input-username');
+      if (input) input.value = '';
+      stepRegister.style.display = 'block';
+    });
+
+    // "Try another name" after being declined by the host: forget the local name
+    // and return to the registration screen (wallet/keys are kept).
+    document.getElementById('btn-declined-other-name').addEventListener('click', () => {
+      app.clearUsername();
+      stepDeclined.style.display = 'none';
+      stepPendingVerification.style.display = 'none';
+      const input = document.getElementById('input-username');
+      if (input) input.value = '';
+      stepRegister.style.display = 'block';
+    });
+
+    // Pending Verification Page Manual Sync
+    document.getElementById('btn-pending-sync').addEventListener('click', async () => {
+      await app.syncLedger();
+      showToast("Verifikations-Status aktualisiert.");
+    });
+
+    // Sync Button
+    document.getElementById('btn-sync').addEventListener('click', async () => {
+      await app.syncLedger();
+      showToast("Ledger erfolgreich synchronisiert!");
+    });
+
+    // Auto-Sync: gleicht periodisch mit dem geteilten Ordner ab, damit Zeugnisse
+    // und neue Aktionen ohne manuelles Klicken propagieren. ~30 s + Jitter, damit
+    // bei vielen Spielern nicht alle Clients gleichzeitig auf den Ordner gehen.
+    // syncLedger ist overlap-sicher, eine Kollision mit manuellen Syncs ist ok.
+    const AUTO_SYNC_BASE_MS = 30000;
+    const AUTO_SYNC_JITTER_MS = 10000;
+    function scheduleAutoSync() {
+      const delay = AUTO_SYNC_BASE_MS + Math.floor(Math.random() * AUTO_SYNC_JITTER_MS);
+      setTimeout(async () => {
+        try {
+          if (app.dirHandle && app.myKeys) await app.syncLedger();
+        } catch (e) {
+          console.warn("Auto-Sync fehlgeschlagen:", e);
+        } finally {
+          scheduleAutoSync();
+        }
+      }, delay);
+    }
+    scheduleAutoSync();
+
+    // Copy Key
+    document.getElementById('btn-copy-key').addEventListener('click', () => {
+      if (app.myKeys) {
+        navigator.clipboard.writeText(app.myKeys.pubKeyBase64);
+        showToast("Public-Key in die Zwischenablage kopiert!");
+      }
+    });
+
+    // Backup Wallet
+    document.getElementById('btn-backup-key').addEventListener('click', () => {
+      if (app.myKeys) {
+        const storedKeys = localStorage.getItem('tippspiel_wallet_keys');
+        const backupData = {
+          wallet_keys: JSON.parse(storedKeys),
+          username: app.myName
+        };
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tippspiel_backup_${app.myName || 'wallet'}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Backup-Datei erfolgreich heruntergeladen!");
+      }
+    });
+
+    // Restore Wallet from Backup File
+    document.getElementById('input-restore-wallet').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const backup = JSON.parse(event.target.result);
+          if (backup.wallet_keys && backup.wallet_keys.public && backup.wallet_keys.private) {
+            localStorage.setItem('tippspiel_wallet_keys', JSON.stringify(backup.wallet_keys));
+            localStorage.setItem('tippspiel_username', backup.username || "");
+            
+            // Re-initialize wallet
+            await app.initWallet();
+            
+            showToast("Wallet erfolgreich aus Backup wiederhergestellt!");
+            
+            // Auto transition UI
+            stepRegister.style.display = 'none';
+            if (app.dirHandle) {
+              await app.syncLedger();
+            }
+          } else {
+            showToast("Ungültige Backup-Datei.");
+          }
+        } catch (err) {
+          console.error(err);
+          showToast("Fehler beim Lesen des Backups.");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Sell Order Submission
+    document.getElementById('form-sell-order').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const sellAsset = document.getElementById('sell-asset').value;
+      const sellAmount = parseFloat(document.getElementById('sell-amount').value);
+      const pricePerUnit = parseFloat(document.getElementById('sell-price-per-unit').value);
+
+      if (!sellAsset) {
+        showToast("Bitte wähle ein Asset zum Verkauf aus.");
+        return;
+      }
+
+      try {
+        await app.publishSellOrder(sellAsset, sellAmount, pricePerUnit);
+        showToast("Verkaufsorder erfolgreich im Orderbuch eingestellt!");
+        document.getElementById('form-sell-order').reset();
+      } catch (err) {
+        console.error(err);
+        showToast("Einstellen der Verkaufsorder fehlgeschlagen.");
+      }
+    });
+
+    // Buy Order Submission
+    document.getElementById('form-buy-order').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const buyAsset = document.getElementById('buy-asset').value;
+      const buyAmount = parseFloat(document.getElementById('buy-amount').value);
+      const pricePerUnit = parseFloat(document.getElementById('buy-price-per-unit').value);
+
+      if (!buyAsset) {
+        showToast("Bitte wähle eine Aktie zum Kauf aus.");
+        return;
+      }
+
+      try {
+        await app.publishBuyOrder(buyAsset, buyAmount, pricePerUnit);
+        showToast("Kaufsorder erfolgreich im Orderbuch eingestellt!");
+        document.getElementById('form-buy-order').reset();
+      } catch (err) {
+        console.error(err);
+        showToast("Einstellen der Kaufsorder fehlgeschlagen.");
+      }
+    });
+
+    // Calc Payout Action
+    document.getElementById('btn-calc-payout').addEventListener('click', () => {
+      const resultsContainer = document.getElementById('payout-results-list');
+
+      const pool = app.config.payoutPool;
+      const rankShares = app.config.payoutRankShares;
+      const totalShares = app.config.startShares;
+
+      // Selected tip winners (registered AG public keys) for places 1/2/3.
+      const rankKeys = [1, 2, 3].map(r => document.getElementById(`payout-rank-${r}`).value);
+
+      if (rankKeys.every(k => !k)) {
+        resultsContainer.innerHTML = '<p style="color: var(--color-danger)">Bitte mindestens einen Tippspiel-Sieger (Platz 1) auswählen.</p>';
+        return;
+      }
+
+      // Guard against the same person being selected on multiple ranks.
+      const chosen = rankKeys.filter(Boolean);
+      if (new Set(chosen).size !== chosen.length) {
+        resultsContainer.innerHTML = '<p style="color: var(--color-danger)">Eine Person darf nicht mehrfach platziert werden.</p>';
+        return;
+      }
+
+      // Real-money prize attached to each ranked "Ich-AG" (per share = prize/100).
+      const prizePerShare = {}; // agKey -> € per single share
+      const prizeTotalForAg = {}; // agKey -> € prize of the whole AG
+      rankKeys.forEach((agKey, idx) => {
+        if (!agKey) return;
+        const prize = pool * rankShares[idx];
+        prizeTotalForAg[agKey] = prize;
+        prizePerShare[agKey] = prize / totalShares;
+      });
+
+      // For every share-trading participant, sum the real value of the winning
+      // shares they hold (Aktienwert) and note their leftover play-money (Restguthaben).
+      const rows = Object.keys(app.balances).map(k => {
+        const bal = app.balances[k];
+        let shareValue = 0;
+        for (const agKey of Object.keys(prizePerShare)) {
+          const qty = bal.SHARES[agKey] || 0;
+          shareValue += qty * prizePerShare[agKey];
+        }
+        return {
+          key: k,
+          name: app.names[k] || k.substring(0, 8),
+          shareValue,
+          restEUR: bal.EUR
+        };
+      }).sort((a, b) => b.shareValue - a.shareValue);
+
+      const distributed = rows.reduce((s, r) => s + r.shareValue, 0);
+
+      // Prize breakdown header.
+      const medals = ['🥇', '🥈', '🥉'];
+      let breakdown = rankKeys.map((agKey, idx) => {
+        if (!agKey) return '';
+        const name = app.names[agKey] || agKey.substring(0, 8);
+        return `${medals[idx]} ${name}-AG: ${prizeTotalForAg[agKey].toFixed(2)} € (${(rankShares[idx] * 100).toFixed(0)} %)`;
+      }).filter(Boolean).join(' &nbsp;|&nbsp; ');
+
+      let html = `<div style="background: var(--bg-input); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;">
+        <strong>Pool:</strong> ${pool.toFixed(2)} € &nbsp;—&nbsp; ${breakdown}
+      </div>`;
+      html += '<div style="background: var(--bg-input); padding: 1rem; border-radius: 8px;">';
+
+      for (const r of rows) {
+        const hasWin = r.shareValue > 0.0001;
+        html += `
+          <div class="list-item">
+            <div>
+              <div class="list-item-title">${r.name}</div>
+              <div class="list-item-sub">Restguthaben (Spielgeld, ohne Auszahlung): ${r.restEUR.toFixed(2)} €</div>
+            </div>
+            <div style="font-size: 1.2rem; font-weight: bold; color: ${hasWin ? 'var(--color-success)' : 'var(--color-text-muted)'};">${r.shareValue.toFixed(2)} €</div>
+          </div>
+        `;
+      }
+      html += '</div>';
+      html += `<p style="color: var(--color-text-muted); font-size: 0.85rem; margin-top: 0.75rem;">
+        Ausgeschüttet: ${distributed.toFixed(2)} € von ${pool.toFixed(2)} € Pool.
+        Restguthaben ist reines Spielgeld zum Aktienkauf und wird nicht real ausgezahlt.
+      </p>`;
+      resultsContainer.innerHTML = html;
+    });
+
+    // Connect state listener to reactively update the complete UI
+    app.onStateChanged = async () => {
+      if (!app.myKeys) return;
+
+      // Hide the integrity banner once a clean sync (no warnings) completed.
+      const integrityBanner = document.getElementById('integrity-banner');
+      if (integrityBanner && app.integrityWarnings.length === 0) {
+        integrityBanner.style.display = 'none';
+      }
+
+      // Show the ledger fingerprint so colleagues can compare their history.
+      const fpEl = document.getElementById('ledger-fingerprint');
+      if (fpEl && app.ledgerFingerprint) {
+        fpEl.textContent = `Ledger: ${app.ledgerFingerprint}`;
+        fpEl.style.display = 'block';
+      }
+
+      const pubKey = app.myKeys.pubKeyBase64;
+      
+      // Determine user's membership status
+      // We are committed if our public key is registered in app.names mapping (which only includes committed REGISTER_NAMEs)
+      const isMyNameCommitted = Object.keys(app.names).includes(pubKey);
+
+      if (!isMyNameCommitted) {
+        // Not (yet) a committed participant -> never show the main dashboard.
+        stepConnect.style.display = 'none';
+        appMain.style.display = 'none';
+
+        if (!app.myName) {
+          // No name chosen yet -> show the registration screen.
+          stepNameTaken.style.display = 'none';
+          stepDeclined.style.display = 'none';
+          stepPendingVerification.style.display = 'none';
+          stepRegister.style.display = 'block';
+          return;
+        }
+
+        if (app.myRegistrationDeclined) {
+          // Explicitly declined by the host/admin -> show declined screen.
+          stepRegister.style.display = 'none';
+          stepNameTaken.style.display = 'none';
+          stepPendingVerification.style.display = 'none';
+          document.getElementById('declined-name').textContent = app.myName;
+          stepDeclined.style.display = 'block';
+          return;
+        }
+
+        if (app.myRegistrationRejected) {
+          // Chosen name is already owned by someone else -> show error screen.
+          stepRegister.style.display = 'none';
+          stepDeclined.style.display = 'none';
+          stepPendingVerification.style.display = 'none';
+          document.getElementById('name-taken-name').textContent = app.myName;
+          stepNameTaken.style.display = 'block';
+          return;
+        }
+
+        // Name chosen and free -> awaiting approval.
+        const myRegTx = app.mempoolTransactions.find(tx => tx.type === "REGISTER_NAME" && tx.senderPubKey === pubKey);
+        stepRegister.style.display = 'none';
+        stepNameTaken.style.display = 'none';
+        stepDeclined.style.display = 'none';
+        stepPendingVerification.style.display = 'block';
+
+        if (myRegTx) {
+          const sigCount = app.signatures[myRegTx.hash] ? app.signatures[myRegTx.hash].size : 0;
+          const reqCount = myRegTx.approvalsRequired || 1;
+          document.getElementById('pending-verification-stats').innerHTML = `
+            ${sigCount} / ${reqCount} erhalten
+            <p style="font-size: 0.8rem; font-weight: normal; color: var(--color-text-muted); margin-top: 0.5rem; text-transform: none;">
+              Erfordert die manuelle Zustimmung von mindestens 75% der berechtigten Kollegen.
+            </p>
+          `;
+        } else if (!app.myRegistrationExists) {
+          // Our REGISTER_NAME file is genuinely missing (never written / deleted):
+          // publish it exactly once. We must NOT republish when a (dropped duplicate)
+          // file already exists, otherwise we'd spam the folder every sync.
+          await app.setUsername(app.myName);
+        }
+        return; // Halt and wait for approvals
+      }
+
+      // If registered, make sure INITIALIZE_PLAYER is sent and committed
+      if (isMyNameCommitted) {
+        const myBal = app.balances[pubKey];
+        if (!myBal || myBal.EUR === 0) {
+          // Check if INITIALIZE_PLAYER is already in mempool
+          const hasInitTx = app.mempoolTransactions.some(tx => tx.type === "INITIALIZE_PLAYER" && tx.senderPubKey === pubKey);
+          const hasCommitInitTx = app.transactions.some(tx => tx.type === "INITIALIZE_PLAYER" && tx.senderPubKey === pubKey);
+          
+          if (!hasInitTx && !hasCommitInitTx) {
+            await app.publishTransaction({
+              type: "INITIALIZE_PLAYER",
+              startEUR: app.config.startEUR,
+              startShares: app.config.startShares
+            });
+            showToast("Sende Krypto-Initialisierung (unabhängige Zeugen benötigt)...");
+          }
+        }
+      }
+
+      // Transition to Main App Dashboard
+      stepPendingVerification.style.display = 'none';
+      stepRegister.style.display = 'none';
+      stepNameTaken.style.display = 'none';
+      stepDeclined.style.display = 'none';
+      appMain.style.display = 'block';
+
+      const myBal = app.balances[pubKey] || { EUR: 0, SHARES: {} };
+      
+      // Update quick metrics
+      document.getElementById('metric-cash').textContent = `${myBal.EUR.toFixed(2)} EUR`;
+      
+      const myOwnSharesQty = myBal.SHARES[pubKey] !== undefined ? myBal.SHARES[pubKey] : 0;
+      document.getElementById('metric-own-shares').textContent = `${myOwnSharesQty} Stück`;
+      
+      let investorsCount = 0;
+      for (const k of Object.keys(app.balances)) {
+        if (k !== pubKey && app.balances[k].SHARES[pubKey] > 0) {
+          investorsCount++;
+        }
+      }
+      document.getElementById('metric-investors').textContent = investorsCount;
+      document.getElementById('metric-pubkey').textContent = pubKey.substring(0, 32) + "...";
+
+      // SYBIL APPROVAL PANEL: Show manual approval card for pending registrations
+      const sybilPanel = document.getElementById('sybil-approval-panel');
+      const sybilList = document.getElementById('sybil-requests-list');
+      let sybilHtml = "";
+      
+      const pendingRegs = app.mempoolTransactions.filter(tx => tx.type === "REGISTER_NAME");
+      
+      for (const reg of pendingRegs) {
+        if (reg.senderPubKey === pubKey) continue; // Don't approve ourselves
+        
+        const alreadyApproved = app.signatures[reg.hash] ? app.signatures[reg.hash].has(pubKey) : false;
+        const alreadyRejected = app.rejectVotes[reg.hash] ? app.rejectVotes[reg.hash].has(pubKey) : false;
+        const sigCount = app.signatures[reg.hash] ? app.signatures[reg.hash].size : 0;
+        const reqCount = reg.approvalsRequired || 1;
+        const rejCount = reg.rejectionCount || 0;
+
+        // Buttons: every committed peer may approve OR reject. Once we have voted
+        // (either way) the action buttons disappear for us so our banner clears.
+        let actionHtml;
+        if (alreadyApproved) {
+          actionHtml = '<span class="status-pill status-green">✓ Du hast zugestimmt</span>';
+        } else if (alreadyRejected) {
+          actionHtml = '<span class="status-pill status-yellow">✗ Du hast abgelehnt</span>';
+        } else {
+          actionHtml =
+            `<button class="btn btn-success btn-approve-sybil" data-txhash="${reg.hash}">👍 Zulassen (Ja)</button>` +
+            `<button class="btn btn-danger btn-reject-sybil" data-txhash="${reg.hash}">👎 Ablehnen (Nein)</button>`;
+        }
+
+        sybilHtml += `
+          <div class="offer-card" style="display: flex; justify-content: space-between; align-items: center; border-color: var(--color-warning); background: rgba(245, 158, 11, 0.05); margin-bottom: 0.5rem;">
+            <div>
+              <strong style="color: var(--color-warning); font-size: 1.05rem;">Mitgliedschafts-Anfrage von '${reg.name}'</strong><br>
+              <span style="font-size: 0.85rem; color: var(--color-text-muted);">Zustimmungen: ${sigCount} von ${reqCount}${rejCount > 0 ? ` &middot; Ablehnungen: ${rejCount}` : ''}</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              ${actionHtml}
+            </div>
+          </div>
+        `;
+      }
+
+      if (sybilHtml) {
+        sybilPanel.style.display = 'block';
+        sybilList.innerHTML = sybilHtml;
+
+        // Bind manual approval click events
+        document.querySelectorAll('.btn-approve-sybil').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const txHash = btn.getAttribute('data-txhash');
+            try {
+              await app.approveRegistration(txHash);
+              showToast("Zustimmung erfolgreich signiert!");
+            } catch (err) {
+              console.error(err);
+              showToast("Freigabe fehlgeschlagen.");
+            }
+          });
+        });
+
+        // Bind manual rejection click events (only authorities see these buttons)
+        document.querySelectorAll('.btn-reject-sybil').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const txHash = btn.getAttribute('data-txhash');
+            if (!confirm("Diesem Spieler deine Zustimmung verweigern? Du kannst danach nicht mehr zustimmen. Erhält er genug Zustimmungen von anderen, wird er trotzdem zugelassen.")) return;
+            try {
+              await app.rejectRegistration(txHash);
+              showToast("Ablehnung gespeichert.");
+            } catch (err) {
+              console.error(err);
+              showToast("Ablehnung fehlgeschlagen.");
+            }
+          });
+        });
+      } else {
+        sybilPanel.style.display = 'none';
+      }
+
+      // Rebuild TAB: Mein Depot
+      const depotList = document.getElementById('depot-list');
+      let depotHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">';
+      depotHtml += `
+        <div class="card" style="border: 1px solid var(--color-success);">
+          <div class="metric-label">Spielgeld Cash</div>
+          <div class="metric-value currency">${myBal.EUR.toFixed(2)} EUR</div>
+        </div>
+      `;
+      
+      for (const shareOwner of Object.keys(myBal.SHARES)) {
+        const qty = myBal.SHARES[shareOwner] || 0;
+        if (qty > 0) {
+          const ownerName = app.names[shareOwner] || shareOwner.substring(0, 8);
+          depotHtml += `
+            <div class="card" style="border: 1px solid var(--color-primary);">
+              <div class="metric-label">AKTIEN: ${ownerName}</div>
+              <div class="metric-value accent">${qty} Stück</div>
+            </div>
+          `;
+        }
+      }
+      depotHtml += '</div>';
+      depotList.innerHTML = depotHtml;
+
+      // Rebuild TAB: Marktplatz Sell dropdown
+      const sellAssetSelect = document.getElementById('sell-asset');
+      // Aktuell ausgewählten Wert merken, damit ein Hintergrund-Re-Render
+      // (z.B. durch Auto-Sync) die Auswahl des Nutzers nicht zurücksetzt.
+      const previouslySelectedAsset = sellAssetSelect.value;
+      sellAssetSelect.innerHTML = '<option value="">Wähle ein Asset im Besitz...</option>';
+      
+      for (const shareOwner of Object.keys(myBal.SHARES)) {
+        const qty = myBal.SHARES[shareOwner] || 0;
+        if (qty > 0) {
+          const ownerName = app.names[shareOwner] || shareOwner.substring(0, 8);
+          sellAssetSelect.innerHTML += `<option value="SHARE_${shareOwner}">Aktie von ${ownerName} (${qty} Stück vorhanden)</option>`;
+        }
+      }
+      // Vorherige Auswahl wiederherstellen, sofern die Option noch existiert.
+      if (previouslySelectedAsset) {
+        const stillExists = Array.from(sellAssetSelect.options)
+          .some(opt => opt.value === previouslySelectedAsset);
+        if (stillExists) sellAssetSelect.value = previouslySelectedAsset;
+      }
+
+      // Rebuild TAB: Marktplatz Buy dropdown.
+      // Anders als beim Verkauf kann man auch Aktien kaufen, die man (noch) nicht
+      // besitzt – daher werden ALLE registrierten Kollegen-AGs angeboten.
+      const buyAssetSelect = document.getElementById('buy-asset');
+      const previouslySelectedBuyAsset = buyAssetSelect.value;
+      buyAssetSelect.innerHTML = '<option value="">Wähle eine Kollegen-AG...</option>';
+      for (const ownerKey of Object.keys(app.names)) {
+        const ownerName = app.names[ownerKey] || ownerKey.substring(0, 8);
+        const label = ownerKey === pubKey ? `Aktie von ${ownerName} (DU)` : `Aktie von ${ownerName}`;
+        buyAssetSelect.innerHTML += `<option value="SHARE_${ownerKey}">${label}</option>`;
+      }
+      if (previouslySelectedBuyAsset) {
+        const stillExists = Array.from(buyAssetSelect.options)
+          .some(opt => opt.value === previouslySelectedBuyAsset);
+        if (stillExists) buyAssetSelect.value = previouslySelectedBuyAsset;
+      }
+
+      // Rebuild TAB: Kurs-Chart Mehrfachauswahl (alle registrierten Kollegen-AGs).
+      // Vorherige Auswahl merken, damit ein Auto-Sync sie nicht zurücksetzt.
+      const chartSelect = document.getElementById('chart-asset-select');
+      const chartInitialPriceEl = document.getElementById('chart-initial-price');
+      if (chartInitialPriceEl) {
+        chartInitialPriceEl.textContent = app.config.initialSharePrice.toFixed(2);
+      }
+      if (chartSelect) {
+        const prevSelected = new Set(Array.from(chartSelect.selectedOptions).map(o => o.value));
+        const hadOptions = chartSelect.options.length > 0;
+        chartSelect.innerHTML = '';
+        const ownerKeys = Object.keys(app.names);
+        for (const ownerKey of ownerKeys) {
+          const ownerName = app.names[ownerKey] || ownerKey.substring(0, 8);
+          const value = `SHARE_${ownerKey}`;
+          const opt = document.createElement('option');
+          opt.value = value;
+          opt.textContent = ownerKey === pubKey ? `${ownerName} (DU)` : ownerName;
+          // Default: alles auswählen, sobald zum ersten Mal Optionen existieren.
+          opt.selected = hadOptions ? prevSelected.has(value) : true;
+          chartSelect.appendChild(opt);
+        }
+        renderChart();
+      }
+
+      // Rebuild TAB: Mitgliederliste
+      const marketList = document.getElementById('market-list');
+      let marketHtml = '<div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem;">';
+      
+      let peersHtml = "";
+      let payoutOptionsHtml = "";
+
+      const activeKeys = Object.keys(app.balances);
+      for (const k of activeKeys) {
+        const name = app.names[k] || k.substring(0, 8);
+        const peerBal = app.balances[k];
+        
+        if (k !== pubKey) {
+          peersHtml += `
+            <div class="list-item">
+              <div>
+                <div class="list-item-title">${name}</div>
+                <div class="list-item-sub">${peerBal.EUR.toFixed(2)} EUR</div>
+              </div>
+              <span class="status-pill status-blue">Aktiv</span>
+            </div>
+          `;
+        } else {
+          peersHtml += `
+            <div class="list-item" style="border-left: 3px solid var(--color-success);">
+              <div>
+                <div class="list-item-title">${name} (DU)</div>
+                <div class="list-item-sub">${peerBal.EUR.toFixed(2)} EUR</div>
+              </div>
+              <span class="status-pill status-green">Online</span>
+            </div>
+          `;
+        }
+
+        payoutOptionsHtml += `<option value="${k}">${k === pubKey ? name + ' (DU)' : name}</option>`;
+
+        marketHtml += `
+          <div class="list-item">
+            <div>
+              <div class="list-item-title">${name} AG</div>
+              <div class="list-item-sub">Kassenguthaben: ${peerBal.EUR.toFixed(2)} EUR | Aktienrückbesitz: ${peerBal.SHARES[k] || 100} Stück</div>
+            </div>
+            <div>
+              <span class="status-pill status-blue">${Object.keys(peerBal.SHARES).filter(sk => peerBal.SHARES[sk] > 0).length} Assets</span>
+            </div>
+          </div>
+        `;
+      }
+      marketHtml += '</div>';
+      marketList.innerHTML = marketHtml;
+      document.getElementById('peers-list').innerHTML = peersHtml || '<p style="color: var(--color-text-muted);">Keine anderen Kollegen online.</p>';
+
+      // Rebuild the three rank dropdowns (Platz 1/2/3), preserving any current pick.
+      for (const r of [1, 2, 3]) {
+        const sel = document.getElementById(`payout-rank-${r}`);
+        if (!sel) continue;
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">– wählen –</option>' + payoutOptionsHtml;
+        sel.value = prev;
+      }
+
+      // Show the configured pool & rank split in the intro line.
+      const payoutIntro = document.getElementById('payout-intro');
+      if (payoutIntro) {
+        const p = app.config.payoutPool;
+        const rs = app.config.payoutRankShares;
+        payoutIntro.innerHTML =
+          `Wähle die Tippspiel-Sieger für Platz 1, 2 und 3. Der reale Pool von ` +
+          `<strong>${p.toFixed(2)} €</strong> wird als Preisgeld an die jeweilige „Ich-AG" ` +
+          `ausgeschüttet (Platz 1: ${(rs[0]*100).toFixed(0)} % = ${(p*rs[0]).toFixed(2)} €, ` +
+          `Platz 2: ${(rs[1]*100).toFixed(0)} % = ${(p*rs[1]).toFixed(2)} €, ` +
+          `Platz 3: ${(rs[2]*100).toFixed(0)} % = ${(p*rs[2]).toFixed(2)} €) und anhand der ` +
+          `Aktienanteile auf die Aktionäre verteilt.`;
+      }
+
+      // Rebuild: Deine laufenden Trades (Validierung läuft)
+      const pendingWrap = document.getElementById('my-pending-trades-wrap');
+      const pendingTradesList = document.getElementById('my-pending-trades-list');
+      const myPendingTrades = app.mempoolTransactions.filter(
+        tx => tx.type === "TRADE" && (tx.partyA === pubKey || tx.partyB === pubKey)
+      );
+      let pendingTradesHtml = "";
+      for (const tx of myPendingTrades) {
+        const iAmSeller = tx.partyA === pubKey;
+        const counterpartyKey = iAmSeller ? tx.partyB : tx.partyA;
+        const counterpartyName = app.names[counterpartyKey] || counterpartyKey.substring(0, 8);
+        const shareOwnerName = app.names[tx.giveAsset.replace("SHARE_", "")] || tx.giveAsset;
+        const got = tx.witnessCount || 0;
+        const need = tx.approvalsRequired ?? 0;
+        const pct = need > 0 ? Math.min(100, Math.round((got / need) * 100)) : 100;
+        pendingTradesHtml += `
+          <div class="offer-card" style="border-color: var(--color-warning); background: rgba(245, 158, 11, 0.05); margin-bottom: 0.75rem;">
+            <div style="font-weight: bold; color: var(--color-warning); margin-bottom: 0.25rem;">
+              ${iAmSeller ? `📤 Verkauf an ${counterpartyName}` : `📥 Kauf von ${counterpartyName}`}
+            </div>
+            <p style="margin: 0 0 0.5rem 0; font-size: 0.95rem;">
+              <strong>${tx.giveAmount} Stück</strong> Aktie von <strong>${shareOwnerName}</strong>
+              für <strong>${tx.receiveAmount.toFixed(2)} EUR</strong>
+            </p>
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 0.35rem;">
+              Validierungen: <strong>${got} / ${need}</strong> ${got >= need ? '✓ (wird ausgeführt)' : `– es fehlen noch ${need - got}`}
+            </div>
+            <div style="background: var(--bg-input); border-radius: 6px; height: 8px; overflow: hidden;">
+              <div style="height: 100%; width: ${pct}%; background: var(--color-warning); transition: width 0.3s;"></div>
+            </div>
+          </div>
+        `;
+      }
+      if (pendingTradesHtml) {
+        pendingWrap.style.display = 'block';
+        pendingTradesList.innerHTML = pendingTradesHtml;
+      } else {
+        pendingWrap.style.display = 'none';
+        pendingTradesList.innerHTML = "";
+      }
+
+      // Rebuild TAB: Marktplatz Open Orders
+      const marketplaceOrdersList = document.getElementById('marketplace-orders-list');
+      let ordersHtml = "";
+      
+      const allOrders = Object.values(app.activeOrders);
+      allOrders.sort((a,b) => b.timestamp - a.timestamp);
+
+      const sellOrders = allOrders.filter(o => o.type !== "BUY_ORDER");
+      const buyOrders = allOrders.filter(o => o.type === "BUY_ORDER");
+
+      for (const order of sellOrders) {
+        const isMyOrder = order.seller === pubKey;
+        const sellerName = app.names[order.seller] || order.seller.substring(0, 8);
+        const shareOwnerName = app.names[order.asset.replace("SHARE_", "")] || order.asset;
+        const totalCost = order.amount * order.pricePerUnit;
+
+        ordersHtml += `
+          <div class="offer-card" style="display: flex; justify-content: space-between; align-items: center; border-style: ${isMyOrder ? 'solid' : 'dashed'}; border-color: ${isMyOrder ? 'var(--color-success)' : 'var(--color-primary)'}; background-color: ${isMyOrder ? 'rgba(16,185,129,0.02)' : 'rgba(56,189,248,0.05)'};">
+            <div>
+              <div style="font-weight: bold; font-size: 1.1rem; color: ${isMyOrder ? 'var(--color-success)' : 'var(--color-primary)'}">
+                ${isMyOrder ? 'Eigene Verkaufsorder' : `Verkaufsorder von ${sellerName}`}
+              </div>
+              <p style="margin: 0.25rem 0 0 0; color: var(--color-text-main); font-size: 0.95rem;">
+                Verkauft: <strong>${order.amount} Stück</strong> Aktie von <strong>${shareOwnerName}</strong><br>
+                Einzelpreis: <strong>${order.pricePerUnit.toFixed(2)} EUR</strong> | Gesamtpreis: <strong style="color: var(--color-success);">${totalCost.toFixed(2)} EUR</strong>
+              </p>
+              <span style="font-size: 0.75rem; color: var(--color-text-muted);">ID: ${order.hash.substring(0,12)}...</span>
+            </div>
+            <div>
+              ${isMyOrder ? 
+                `<div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
+                   <span class="status-pill status-green">Dein Angebot</span>
+                   <button class="btn btn-cancel-order" data-orderhash="${order.hash}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background: var(--color-danger); color: #fff;">✕ Zurückziehen</button>
+                 </div>` : 
+                `<button class="btn btn-success btn-buy-order" data-orderhash="${order.hash}">🛒 Kaufen</button>`
+              }
+            </div>
+          </div>
+        `;
+      }
+
+      marketplaceOrdersList.innerHTML = ordersHtml || '<p style="color: var(--color-text-muted)">Aktuell keine offenen Verkaufsangebote im Orderbuch.</p>';
+
+      // Rebuild TAB: Marktplatz Open Buy Orders (Kaufgesuche)
+      const marketplaceBuyOrdersList = document.getElementById('marketplace-buyorders-list');
+      let buyOrdersHtml = "";
+
+      for (const order of buyOrders) {
+        const isMyOrder = order.buyer === pubKey;
+        const buyerName = app.names[order.buyer] || order.buyer.substring(0, 8);
+        const shareOwnerName = app.names[order.asset.replace("SHARE_", "")] || order.asset;
+        const totalCost = order.amount * order.pricePerUnit;
+        // I can serve this buy order only if I own enough of the requested share.
+        const shareOwnerKey = order.asset.replace("SHARE_", "");
+        const myShares = (myBal.SHARES && myBal.SHARES[shareOwnerKey]) || 0;
+        const canServe = !isMyOrder && myShares >= order.amount;
+
+        buyOrdersHtml += `
+          <div class="offer-card" style="display: flex; justify-content: space-between; align-items: center; border-style: ${isMyOrder ? 'solid' : 'dashed'}; border-color: ${isMyOrder ? 'var(--color-success)' : 'var(--color-warning)'}; background-color: ${isMyOrder ? 'rgba(16,185,129,0.02)' : 'rgba(245,158,11,0.05)'};">
+            <div>
+              <div style="font-weight: bold; font-size: 1.1rem; color: ${isMyOrder ? 'var(--color-success)' : 'var(--color-warning)'}">
+                ${isMyOrder ? 'Eigene Kaufsorder' : `Kaufgesuch von ${buyerName}`}
+              </div>
+              <p style="margin: 0.25rem 0 0 0; color: var(--color-text-main); font-size: 0.95rem;">
+                Sucht: <strong>${order.amount} Stück</strong> Aktie von <strong>${shareOwnerName}</strong><br>
+                Einzelpreis: <strong>${order.pricePerUnit.toFixed(2)} EUR</strong> | Gesamterlös: <strong style="color: var(--color-success);">${totalCost.toFixed(2)} EUR</strong>
+              </p>
+              <span style="font-size: 0.75rem; color: var(--color-text-muted);">ID: ${order.hash.substring(0,12)}...</span>
+            </div>
+            <div>
+              ${isMyOrder ? 
+                `<div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
+                   <span class="status-pill status-green">Dein Gesuch</span>
+                   <button class="btn btn-cancel-buyorder" data-orderhash="${order.hash}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background: var(--color-danger); color: #fff;">✕ Zurückziehen</button>
+                 </div>` : 
+                (canServe
+                  ? `<button class="btn btn-success btn-sell-into-order" data-orderhash="${order.hash}">💸 Verkaufen</button>`
+                  : `<span class="status-pill status-blue" title="Du besitzt nur ${myShares} Stück">Nicht genug Aktien</span>`)
+              }
+            </div>
+          </div>
+        `;
+      }
+
+      marketplaceBuyOrdersList.innerHTML = buyOrdersHtml || '<p style="color: var(--color-text-muted)">Aktuell keine offenen Kaufgesuche im Orderbuch.</p>';
+
+      // Bind buying actions
+      document.querySelectorAll('.btn-buy-order').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const hash = btn.getAttribute('data-orderhash');
+          const order = app.activeOrders[hash];
+          if (!order) return;
+
+          const totalCost = order.amount * order.pricePerUnit;
+          if (myBal.EUR < totalCost) {
+            alert("Fehler:\n\nDu hast unzureichendes EUR Guthaben, um diese Order zu kaufen!");
+            return;
+          }
+
+          try {
+            await app.executeOrder(order);
+            showToast("Kauf eingeleitet! Warte auf Bestätigung durch unabhängige Zeugen...");
+          } catch (err) {
+            console.error(err);
+            showToast("Kauf fehlgeschlagen.");
+          }
+        });
+      });
+
+      // Bind selling actions (serving a buy order / Kaufgesuch)
+      document.querySelectorAll('.btn-sell-into-order').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const hash = btn.getAttribute('data-orderhash');
+          const order = app.activeOrders[hash];
+          if (!order) return;
+
+          const shareOwnerKey = order.asset.replace("SHARE_", "");
+          const myShares = (myBal.SHARES && myBal.SHARES[shareOwnerKey]) || 0;
+          if (myShares < order.amount) {
+            alert("Fehler:\n\nDu besitzt nicht genügend Aktien, um dieses Kaufgesuch zu bedienen!");
+            return;
+          }
+
+          try {
+            await app.executeBuyOrder(order);
+            showToast("Verkauf eingeleitet! Warte auf Bestätigung durch unabhängige Zeugen...");
+          } catch (err) {
+            console.error(err);
+            showToast("Verkauf fehlgeschlagen.");
+          }
+        });
+      });
+
+      // Bind withdraw (cancel) actions for own buy orders
+      document.querySelectorAll('.btn-cancel-buyorder').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const hash = btn.getAttribute('data-orderhash');
+          try {
+            await app.cancelBuyOrder(hash);
+            showToast("Kaufgesuch zurückgezogen.");
+          } catch (err) {
+            console.error(err);
+            showToast("Zurückziehen fehlgeschlagen: " + err.message);
+          }
+        });
+      });
+
+      // Bind withdraw (cancel) actions for own orders
+      document.querySelectorAll('.btn-cancel-order').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const hash = btn.getAttribute('data-orderhash');
+          try {
+            await app.cancelSellOrder(hash);
+            showToast("Verkaufsangebot zurückgezogen.");
+          } catch (err) {
+            console.error(err);
+            showToast("Zurückziehen fehlgeschlagen: " + err.message);
+          }
+        });
+      });
+
+      // Rebuild TAB: Ledger Logs list
+      const ledgerList = document.getElementById('ledger-list');
+      let ledgerHtml = "";
+      for (const tx of [...app.transactions].reverse()) {
+        const sender = app.names[tx.senderPubKey] || tx.senderPubKey.substring(0, 8);
+        ledgerHtml += `<div style="border-bottom: 1px solid #1e293b; padding: 0.4rem 0;">
+          <strong>[COMMIT]</strong> [${tx.type}] ${sender} - Hash: ${tx.hash.substring(0, 8)} - Zeugen: ${tx.witnessCount}
+        </div>`;
+      }
+      ledgerList.innerHTML = ledgerHtml || '<div style="color: var(--color-text-muted)">Noch keine bestätigten Blöcke.</div>';
+
+      const mempoolList = document.getElementById('mempool-list');
+      let mempoolHtml = "";
+      for (const tx of [...app.mempoolTransactions].reverse()) {
+        const sender = app.names[tx.senderPubKey] || tx.senderPubKey.substring(0, 8);
+        const approvalsString = tx.type === "REGISTER_NAME" ? `Zustimmung: ${tx.witnessCount}/${tx.approvalsRequired || 1}` : `Zeugen: ${tx.witnessCount || 0}/${tx.approvalsRequired ?? 0}`;
+        mempoolHtml += `<div style="border-bottom: 1px solid #1e293b; padding: 0.4rem 0;">
+          <strong>[PENDING]</strong> [${tx.type}] ${sender} - Hash: ${tx.hash.substring(0, 8)} - ${approvalsString}
+        </div>`;
+      }
+      mempoolList.innerHTML = mempoolHtml || '<div style="color: var(--color-text-muted)">Mempool ist leer.</div>';
+    };
+  </script>
+</body>
+</html>
